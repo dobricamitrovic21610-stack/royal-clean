@@ -5,7 +5,6 @@ gsap.registerPlugin(ScrollTrigger);
 const ASSETS = {
     logo: 'assets/logo.png',
     heroBg: 'assets/hero-bg.jpg',
-    carpet: 'assets/gallery/3.jpg',
 };
 
 const canvas = document.getElementById('webgl-canvas');
@@ -50,24 +49,75 @@ function loadTexture(key, url) {
 
 await Promise.all([
     loadTexture('heroBg', ASSETS.heroBg),
-    loadTexture('carpet', ASSETS.carpet),
     loadTexture('logo', ASSETS.logo),
 ]);
 
-const fallbackCarpet = new THREE.CanvasTexture(createFallbackCarpet());
-fallbackCarpet.colorSpace = THREE.SRGBColorSpace;
-fallbackCarpet.wrapS = fallbackCarpet.wrapT = THREE.RepeatWrapping;
-fallbackCarpet.repeat.set(2, 1);
+const carpetTex = createCarpetTexture();
+carpetTex.colorSpace = THREE.SRGBColorSpace;
+carpetTex.wrapS = carpetTex.wrapT = THREE.RepeatWrapping;
+carpetTex.repeat.set(3, 2);
 
-function createFallbackCarpet() {
-    const size = 128;
+function createCarpetTexture() {
+    const size = 512;
     const c = document.createElement('canvas');
     c.width = size;
     c.height = size;
     const ctx = c.getContext('2d');
-    ctx.fillStyle = '#8b6914';
+    ctx.fillStyle = '#7a5535';
     ctx.fillRect(0, 0, size, size);
-    return c;
+    for (let i = 0; i < 12000; i++) {
+        const x = Math.random() * size;
+        const y = Math.random() * size;
+        const len = 3 + Math.random() * 8;
+        const angle = Math.random() * Math.PI;
+        const shade = 90 + Math.random() * 70;
+        ctx.strokeStyle = `rgba(${shade}, ${shade * 0.72}, ${shade * 0.48}, 0.55)`;
+        ctx.lineWidth = 0.4 + Math.random();
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + Math.cos(angle) * len, y + Math.sin(angle) * len);
+        ctx.stroke();
+    }
+    for (let i = 0; i < 40; i++) {
+        const x = Math.random() * size;
+        const y = Math.random() * size;
+        const r = 8 + Math.random() * 25;
+        const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+        g.addColorStop(0, 'rgba(35, 22, 12, 0.45)');
+        g.addColorStop(1, 'rgba(35, 22, 12, 0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(x - r, y - r, r * 2, r * 2);
+    }
+    return new THREE.CanvasTexture(c);
+}
+
+const cleanCarpetTex = createCleanCarpetTexture();
+cleanCarpetTex.colorSpace = THREE.SRGBColorSpace;
+cleanCarpetTex.wrapS = cleanCarpetTex.wrapT = THREE.RepeatWrapping;
+cleanCarpetTex.repeat.set(3, 2);
+
+function createCleanCarpetTexture() {
+    const size = 512;
+    const c = document.createElement('canvas');
+    c.width = size;
+    c.height = size;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#e8e4dc';
+    ctx.fillRect(0, 0, size, size);
+    for (let i = 0; i < 10000; i++) {
+        const x = Math.random() * size;
+        const y = Math.random() * size;
+        const len = 2 + Math.random() * 6;
+        const angle = Math.random() * Math.PI;
+        const shade = 200 + Math.random() * 40;
+        ctx.strokeStyle = `rgba(${shade}, ${shade}, ${shade - 8}, 0.35)`;
+        ctx.lineWidth = 0.3 + Math.random() * 0.5;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + Math.cos(angle) * len, y + Math.sin(angle) * len);
+        ctx.stroke();
+    }
+    return new THREE.CanvasTexture(c);
 }
 
 // Lights
@@ -100,7 +150,7 @@ scene.add(backdrop);
 // Carpet with real texture
 const carpetGroup = new THREE.Group();
 const carpetMat = new THREE.MeshStandardMaterial({
-    map: textures.carpet || fallbackCarpet,
+    map: carpetTex,
     roughness: 0.82,
     metalness: 0.04,
 });
@@ -182,34 +232,9 @@ for (let i = 0; i < 3; i++) {
 }
 scene.add(orbitGroup);
 
-// Gallery 3D — light corridor only (no duplicate photos)
+// Gallery section — no 3D visuals (HTML gallery only)
 const galleryLightGroup = new THREE.Group();
-const beamMat = new THREE.MeshBasicMaterial({
-    color: 0xf11414,
-    transparent: true,
-    opacity: 0.12,
-    side: THREE.DoubleSide,
-});
-for (let i = 0; i < 5; i++) {
-    const beam = new THREE.Mesh(new THREE.PlaneGeometry(0.15, 8), beamMat.clone());
-    beam.position.set((i - 2) * 1.4, 2, -i * 0.8);
-    beam.rotation.x = -0.4;
-    beam.rotation.y = (i - 2) * 0.18;
-    galleryLightGroup.add(beam);
-}
-const galleryFloor = new THREE.Mesh(
-    new THREE.PlaneGeometry(12, 12),
-    new THREE.MeshStandardMaterial({
-        color: 0x111118,
-        metalness: 0.9,
-        roughness: 0.15,
-        transparent: true,
-        opacity: 0.5,
-    })
-);
-galleryFloor.rotation.x = -Math.PI / 2;
-galleryFloor.position.y = -0.55;
-galleryLightGroup.add(galleryFloor);
+galleryLightGroup.visible = false;
 scene.add(galleryLightGroup);
 
 // Contact portal with logo
@@ -247,11 +272,11 @@ scene.add(gridHelper);
 
 // Camera keyframes per scene
 const CAMERAS = [
-    { pos: [0, 2.8, 9], look: [0, 0.2, 0] },
-    { pos: [1.2, 3.2, 5.5], look: [-0.8, 0.3, 0] },
-    { pos: [2.5, 4.2, 4.5], look: [0, 1.2, -1] },
-    { pos: [0, 1.8, 8], look: [0, 0.5, -2] },
-    { pos: [0, 2.5, 5.5], look: [0, 0.2, 0] },
+    { pos: [0, 3.2, 10], look: [0, 0.3, 0] },
+    { pos: [1.8, 3.6, 5], look: [-1, 0.4, 0] },
+    { pos: [3.2, 5, 4], look: [0, 1.5, -1.2] },
+    { pos: [0, 2.5, 9], look: [0, 0, 0] },
+    { pos: [0, 2.8, 4.8], look: [0, 0.3, 0] },
 ];
 
 const scrollState = { progress: 0, sceneIndex: 0, sceneProgress: 0, blend: 0 };
@@ -286,7 +311,7 @@ function blendCamera(idx, local) {
         lerpScene(current.look[1], next.look[1], t * 0.35),
         lerpScene(current.look[2], next.look[2], t * 0.35)
     );
-    camera.position.lerp(cameraPosition, 0.12);
+    camera.position.lerp(cameraPosition, 0.18);
 }
 
 function updateScene3D(time) {
@@ -296,78 +321,94 @@ function updateScene3D(time) {
 
     blendCamera(idx, local);
 
-    const show = (group, amount) => { group.visible = amount > 0.02; };
-
-    // Global backdrop
-    backdrop.material.opacity = 0.35 + (idx === 0 ? 0.25 * (1 - local) : 0);
-
-    // Scene weights for smooth crossfade
     const weights = [0, 0, 0, 0, 0];
     weights[idx] = 1 - local;
     if (idx < SCENE_COUNT - 1) weights[idx + 1] = local;
 
-    // Hero + carpet base
+    const galleryActive = weights[3];
+    const canvasFade = Math.max(0, 1 - galleryActive * 2.5);
+    canvas.style.opacity = canvasFade;
+    canvas.style.transition = 'opacity 0.15s linear';
+
+    // Hide all 3D during gallery — no floating work images
+    if (galleryActive > 0.08) {
+        carpetGroup.visible = false;
+        machineGroup.visible = false;
+        orbitGroup.visible = false;
+        contactGroup.visible = false;
+        backdrop.visible = false;
+        gridHelper.visible = false;
+        foamMat.opacity = 0;
+        return;
+    }
+
+    backdrop.visible = true;
+    gridHelper.visible = true;
+
+    backdrop.material.opacity = 0.3 + weights[0] * 0.35;
+
     const carpetWeight = weights[0] + weights[1] + weights[2];
     carpetGroup.visible = carpetWeight > 0.05;
+
+    const cleanBlend = Math.min(1, weights[1] * 1.5 + weights[2]);
+    carpetMat.map = cleanBlend > 0.55 ? cleanCarpetTex : carpetTex;
     carpetMat.color.setRGB(
-        lerpScene(0.72, 1, weights[1] + weights[2]),
-        lerpScene(0.68, 1, weights[1] + weights[2]),
-        lerpScene(0.62, 1, weights[1] + weights[2])
+        lerpScene(0.7, 1, cleanBlend),
+        lerpScene(0.65, 1, cleanBlend),
+        lerpScene(0.58, 1, cleanBlend)
     );
 
-    carpetGroup.rotation.y = scrollState.progress * Math.PI * 1.6 + time * 0.15 * weights[0];
-    carpetGroup.rotation.x = -0.12 + weights[2] * (-Math.PI / 2 + 0.35);
+    const heroBoost = weights[0];
+    carpetGroup.rotation.y = scrollState.progress * Math.PI * 2.4 + time * 0.35 * heroBoost;
+    carpetGroup.rotation.x = -0.15 + Math.sin(time * 1.2) * 0.08 * heroBoost + weights[2] * (-Math.PI / 2 + 0.4);
+    carpetGroup.rotation.z = Math.sin(time * 0.8) * 0.06 * heroBoost;
     carpetGroup.position.set(
-        lerpScene(0, -1.6, weights[1]),
-        lerpScene(0, 1.6, weights[2]),
-        lerpScene(0, -1.8, weights[2])
+        lerpScene(0, -1.8, weights[1]),
+        lerpScene(Math.sin(time * 1.5) * 0.15, 1.8, weights[2]),
+        lerpScene(0, -2, weights[2])
     );
-    carpetGroup.scale.setScalar(lerpScene(1, 0.85, weights[2]));
+    carpetGroup.scale.setScalar(lerpScene(1 + Math.sin(time * 2) * 0.04, 0.82, weights[2]));
 
-    // Services
-    show(machineGroup, weights[1]);
-    machineGroup.position.set(lerpScene(3.5, 1.2, local * weights[1]), 0, 0.6);
-    machineGroup.rotation.y = -0.35 - local * 0.4;
-    foamMat.opacity = weights[1] * 0.85;
+    machineGroup.visible = weights[1] > 0.05;
+    machineGroup.position.set(
+        lerpScene(4, 0.8, weights[1]),
+        Math.sin(time * 3) * 0.05,
+        0.6 + Math.sin(time * 2) * 0.1
+    );
+    machineGroup.rotation.y = -0.5 - weights[1] * 0.6;
+    nozzle.rotation.x = Math.sin(time * 6) * 0.08;
+    foamMat.opacity = weights[1] * 1;
 
     if (weights[1] > 0.05) {
         const arr = foamGeo.attributes.position.array;
         for (let i = 0; i < foamCount; i++) {
-            arr[i * 3] += foamVel[i * 3];
-            arr[i * 3 + 1] += foamVel[i * 3 + 1];
-            arr[i * 3 + 2] += foamVel[i * 3 + 2];
-            foamLife[i] += 0.02;
-            if (foamLife[i] > 1 || arr[i * 3] < -3) resetFoam(i);
+            arr[i * 3] += foamVel[i * 3] * 1.4;
+            arr[i * 3 + 1] += foamVel[i * 3 + 1] * 1.4;
+            arr[i * 3 + 2] += foamVel[i * 3 + 2] * 1.4;
+            foamLife[i] += 0.03;
+            if (foamLife[i] > 1 || arr[i * 3] < -3.5) resetFoam(i);
         }
         foamGeo.attributes.position.needsUpdate = true;
     }
 
-    // About rings
-    show(orbitGroup, weights[2]);
-    orbitGroup.rotation.y = time * 0.35;
+    orbitGroup.visible = weights[2] > 0.05;
+    orbitGroup.rotation.y = time * 0.55;
     orbitGroup.position.copy(carpetGroup.position);
     orbitGroup.children.forEach((ring, i) => {
-        ring.rotation.z = time * (0.4 + i * 0.15);
+        ring.rotation.z = time * (0.55 + i * 0.2);
+        ring.scale.setScalar(1 + Math.sin(time * 2 + i) * 0.06);
     });
 
-    // Gallery lights only
-    show(galleryLightGroup, weights[3]);
-    galleryLightGroup.rotation.y = local * 0.6 + time * 0.08;
-    galleryLightGroup.children.forEach((child, i) => {
-        if (child.material?.opacity !== undefined && i < 5) {
-            child.material.opacity = 0.08 + Math.sin(time * 1.5 + i) * 0.05 + weights[3] * 0.1;
-        }
-    });
+    contactGroup.visible = weights[4] > 0.05;
+    portalRing.rotation.z = time * 0.8;
+    portalRing2.rotation.z = -time * 1.1;
+    contactGroup.rotation.y = Math.sin(time * 0.35) * 0.25;
+    contactGroup.scale.setScalar(1 + Math.sin(time * 1.5) * 0.05);
+    logoPlane.rotation.z = Math.sin(time * 0.5) * 0.08;
 
-    // Contact portal
-    show(contactGroup, weights[4]);
-    portalRing.rotation.z = time * 0.55;
-    portalRing2.rotation.z = -time * 0.75;
-    contactGroup.rotation.y = Math.sin(time * 0.25) * 0.15;
-    logoPlane.rotation.z = Math.sin(time * 0.4) * 0.05;
-
-    gridHelper.material.opacity = 0.12 + carpetWeight * 0.12;
-    spotLight.intensity = 1.5 + weights[1] * 1.2;
+    gridHelper.material.opacity = 0.1 + carpetWeight * 0.18;
+    spotLight.intensity = 1.8 + weights[1] * 1.8;
+    rimLight.intensity = 1.1 + weights[0] * 0.6;
 }
 
 const clock = new THREE.Clock();
@@ -389,6 +430,7 @@ if (!prefersReducedMotion) {
         scrollState.progress = progress;
         progressBar.style.width = `${progress * 100}%`;
         nav.classList.toggle('scrolled', scroll > 50);
+        document.body.classList.toggle('gallery-active', scrollState.sceneIndex === 3);
         updateActiveNav();
         updateCardTilts();
         ScrollTrigger.update();
@@ -429,31 +471,19 @@ if (!prefersReducedMotion) {
 
     document.querySelectorAll('.gallery-frame').forEach((frame, i) => {
         gsap.fromTo(frame,
-            { opacity: 0, scale: 0.85, rotateY: i % 2 ? 12 : -12 },
+            { opacity: 0, y: 40 },
             {
                 opacity: 1,
-                scale: 1,
-                rotateY: 0,
-                duration: 1,
+                y: 0,
+                duration: 0.8,
                 ease: 'power2.out',
                 scrollTrigger: {
                     trigger: frame,
-                    start: 'top 85%',
+                    start: 'top 88%',
                     toggleActions: 'play none none reverse',
                 },
             }
         );
-
-        gsap.to(frame, {
-            y: -30 * (i % 2 ? 1 : -1),
-            ease: 'none',
-            scrollTrigger: {
-                trigger: '#gallery',
-                start: 'top bottom',
-                end: 'bottom top',
-                scrub: 1.8,
-            },
-        });
     });
 
     gsap.to('.hero-title .title-accent', {
