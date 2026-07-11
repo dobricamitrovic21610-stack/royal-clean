@@ -282,36 +282,46 @@ const CAMERAS = [
 const scrollState = { progress: 0, sceneIndex: 0, sceneProgress: 0, blend: 0 };
 const SCENE_COUNT = 5;
 
-function easeInOutCubic(t) {
-    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-}
-
 function lerpScene(a, b, t) {
     return a + (b - a) * t;
+}
+
+function easeInOutQuart(t) {
+    return t < 0.5 ? 8 * t * t * t * t : 1 - Math.pow(-2 * t + 2, 4) / 2;
 }
 
 function getSceneFromProgress(p) {
     const scaled = p * SCENE_COUNT;
     const idx = Math.min(Math.floor(scaled), SCENE_COUNT - 1);
-    return { idx, local: easeInOutCubic(Math.min(scaled - idx, 1)) };
+    return { idx, local: easeInOutQuart(Math.min(scaled - idx, 1)) };
 }
 
-function blendCamera(idx, local) {
+function blendCamera(idx, local, time) {
     const current = CAMERAS[idx];
     const next = CAMERAS[Math.min(idx + 1, SCENE_COUNT - 1)];
-    const t = idx === SCENE_COUNT - 1 ? 0 : local;
+    const t = idx === SCENE_COUNT - 1 ? 0 : easeInOutQuart(local);
+    const sway = Math.sin(time * 0.4) * 0.12;
 
     cameraPosition.set(
-        lerpScene(current.pos[0], next.pos[0], t * 0.35),
-        lerpScene(current.pos[1], next.pos[1], t * 0.35),
-        lerpScene(current.pos[2], next.pos[2], t * 0.35)
+        lerpScene(current.pos[0], next.pos[0], t) + sway,
+        lerpScene(current.pos[1], next.pos[1], t),
+        lerpScene(current.pos[2], next.pos[2], t)
     );
     cameraTarget.set(
-        lerpScene(current.look[0], next.look[0], t * 0.35),
-        lerpScene(current.look[1], next.look[1], t * 0.35),
-        lerpScene(current.look[2], next.look[2], t * 0.35)
+        lerpScene(current.look[0], next.look[0], t),
+        lerpScene(current.look[1], next.look[1], t) + Math.sin(time * 0.5) * 0.05,
+        lerpScene(current.look[2], next.look[2], t)
     );
-    camera.position.lerp(cameraPosition, 0.18);
+    camera.position.lerp(cameraPosition, 0.14);
+    camera.fov = lerpScene(42, 48, weightsBlend(idx, local, 2));
+    camera.updateProjectionMatrix();
+}
+
+function weightsBlend(idx, local, targetIdx) {
+    const w = [0, 0, 0, 0, 0];
+    w[idx] = 1 - local;
+    if (idx < SCENE_COUNT - 1) w[idx + 1] = local;
+    return w[targetIdx] || 0;
 }
 
 function updateScene3D(time) {
@@ -319,19 +329,20 @@ function updateScene3D(time) {
     scrollState.sceneIndex = idx;
     scrollState.sceneProgress = local;
 
-    blendCamera(idx, local);
+    blendCamera(idx, local, time);
 
     const weights = [0, 0, 0, 0, 0];
     weights[idx] = 1 - local;
     if (idx < SCENE_COUNT - 1) weights[idx + 1] = local;
 
     const galleryActive = weights[3];
-    const canvasFade = Math.max(0, 1 - galleryActive * 2.5);
+    const canvasFade = Math.max(0, 1 - easeInOutQuart(Math.min(1, galleryActive * 1.8)));
     canvas.style.opacity = canvasFade;
-    canvas.style.transition = 'opacity 0.15s linear';
+    canvas.style.transition = 'opacity 0.35s ease';
 
-    // Hide all 3D during gallery — no floating work images
-    if (galleryActive > 0.08) {
+    backdrop.rotation.y = time * 0.04 + scrollState.progress * 0.3;
+
+    if (galleryActive > 0.12) {
         carpetGroup.visible = false;
         machineGroup.visible = false;
         orbitGroup.visible = false;
@@ -359,25 +370,26 @@ function updateScene3D(time) {
     );
 
     const heroBoost = weights[0];
-    carpetGroup.rotation.y = scrollState.progress * Math.PI * 2.4 + time * 0.35 * heroBoost;
-    carpetGroup.rotation.x = -0.15 + Math.sin(time * 1.2) * 0.08 * heroBoost + weights[2] * (-Math.PI / 2 + 0.4);
-    carpetGroup.rotation.z = Math.sin(time * 0.8) * 0.06 * heroBoost;
+    carpetGroup.rotation.y = scrollState.progress * Math.PI * 2 + time * 0.28 * heroBoost;
+    carpetGroup.rotation.x = -0.12 + Math.sin(time * 1.1) * 0.06 * heroBoost + weights[2] * (-Math.PI / 2 + 0.35);
+    carpetGroup.rotation.z = Math.sin(time * 0.7) * 0.05 * heroBoost;
     carpetGroup.position.set(
-        lerpScene(0, -1.8, weights[1]),
-        lerpScene(Math.sin(time * 1.5) * 0.15, 1.8, weights[2]),
-        lerpScene(0, -2, weights[2])
+        lerpScene(0, -1.6, easeInOutQuart(weights[1])),
+        lerpScene(Math.sin(time * 1.3) * 0.12, 1.6, easeInOutQuart(weights[2])),
+        lerpScene(0, -1.8, easeInOutQuart(weights[2]))
     );
-    carpetGroup.scale.setScalar(lerpScene(1 + Math.sin(time * 2) * 0.04, 0.82, weights[2]));
+    carpetGroup.scale.setScalar(lerpScene(1 + Math.sin(time * 1.8) * 0.03, 0.84, easeInOutQuart(weights[2])));
 
-    machineGroup.visible = weights[1] > 0.05;
+    machineGroup.visible = weights[1] > 0.04;
+    const machineT = easeInOutQuart(weights[1]);
     machineGroup.position.set(
-        lerpScene(4, 0.8, weights[1]),
-        Math.sin(time * 3) * 0.05,
-        0.6 + Math.sin(time * 2) * 0.1
+        lerpScene(4.2, 0.6, machineT),
+        Math.sin(time * 2.5) * 0.04,
+        0.5 + Math.sin(time * 1.8) * 0.08
     );
-    machineGroup.rotation.y = -0.5 - weights[1] * 0.6;
-    nozzle.rotation.x = Math.sin(time * 6) * 0.08;
-    foamMat.opacity = weights[1] * 1;
+    machineGroup.rotation.y = lerpScene(-0.2, -0.9, machineT);
+    nozzle.rotation.x = Math.sin(time * 5) * 0.06;
+    foamMat.opacity = weights[1] * 0.9;
 
     if (weights[1] > 0.05) {
         const arr = foamGeo.attributes.position.array;
@@ -391,20 +403,21 @@ function updateScene3D(time) {
         foamGeo.attributes.position.needsUpdate = true;
     }
 
-    orbitGroup.visible = weights[2] > 0.05;
-    orbitGroup.rotation.y = time * 0.55;
+    orbitGroup.visible = weights[2] > 0.04;
+    orbitGroup.rotation.y = time * 0.45;
     orbitGroup.position.copy(carpetGroup.position);
     orbitGroup.children.forEach((ring, i) => {
-        ring.rotation.z = time * (0.55 + i * 0.2);
-        ring.scale.setScalar(1 + Math.sin(time * 2 + i) * 0.06);
+        ring.rotation.z = time * (0.45 + i * 0.18);
+        ring.scale.setScalar(1 + Math.sin(time * 1.8 + i * 1.2) * 0.05);
     });
 
-    contactGroup.visible = weights[4] > 0.05;
-    portalRing.rotation.z = time * 0.8;
-    portalRing2.rotation.z = -time * 1.1;
-    contactGroup.rotation.y = Math.sin(time * 0.35) * 0.25;
-    contactGroup.scale.setScalar(1 + Math.sin(time * 1.5) * 0.05);
-    logoPlane.rotation.z = Math.sin(time * 0.5) * 0.08;
+    const contactT = easeInOutQuart(weights[4]);
+    contactGroup.visible = contactT > 0.04;
+    portalRing.rotation.z = time * 0.65;
+    portalRing2.rotation.z = -time * 0.9;
+    contactGroup.rotation.y = Math.sin(time * 0.3) * 0.2;
+    contactGroup.scale.setScalar(0.85 + contactT * 0.2 + Math.sin(time * 1.2) * 0.03);
+    logoPlane.rotation.z = Math.sin(time * 0.45) * 0.06;
 
     gridHelper.material.opacity = 0.1 + carpetWeight * 0.18;
     spotLight.intensity = 1.8 + weights[1] * 1.8;
@@ -424,13 +437,18 @@ animate();
 // Lenis + scroll
 let lenis;
 if (!prefersReducedMotion) {
-    lenis = new Lenis({ duration: 1.2, smoothWheel: true });
+    lenis = new Lenis({ duration: 1.05, smoothWheel: true });
 
     lenis.on('scroll', ({ scroll, progress }) => {
         scrollState.progress = progress;
         progressBar.style.width = `${progress * 100}%`;
         nav.classList.toggle('scrolled', scroll > 50);
-        document.body.classList.toggle('gallery-active', scrollState.sceneIndex === 3);
+        const { idx, local } = getSceneFromProgress(progress);
+        const w = [0, 0, 0, 0, 0];
+        w[idx] = 1 - local;
+        if (idx < SCENE_COUNT - 1) w[idx + 1] = local;
+        document.body.classList.toggle('gallery-active', w[3] > 0.25);
+        document.querySelector('.scroll-hint')?.style.setProperty('opacity', scroll > 80 ? '0' : '1');
         updateActiveNav();
         updateCardTilts();
         ScrollTrigger.update();
@@ -449,20 +467,32 @@ if (!prefersReducedMotion) {
 
 // Content animations
 if (!prefersReducedMotion) {
+    gsap.from('#hero .reveal-item', {
+        opacity: 0,
+        y: 60,
+        duration: 1.1,
+        stagger: 0.15,
+        ease: 'power3.out',
+        delay: 0.2,
+    });
+
     panels.forEach((panel) => {
+        if (panel.id === 'hero') return;
         const items = panel.querySelectorAll('.reveal-item');
         gsap.fromTo(items,
-            { opacity: 0, y: 50, rotateX: 8 },
+            { opacity: 0, y: 45, filter: 'blur(6px)' },
             {
                 opacity: 1,
                 y: 0,
-                rotateX: 0,
-                duration: 0.9,
-                stagger: 0.12,
-                ease: 'power3.out',
+                filter: 'blur(0px)',
+                duration: 0.85,
+                stagger: 0.1,
+                ease: 'power2.out',
                 scrollTrigger: {
                     trigger: panel,
-                    start: 'top 72%',
+                    start: 'top 70%',
+                    end: 'top 30%',
+                    scrub: false,
                     toggleActions: 'play none none reverse',
                 },
             }
@@ -471,15 +501,17 @@ if (!prefersReducedMotion) {
 
     document.querySelectorAll('.gallery-frame').forEach((frame, i) => {
         gsap.fromTo(frame,
-            { opacity: 0, y: 40 },
+            { opacity: 0, y: 50, scale: 0.96 },
             {
                 opacity: 1,
                 y: 0,
-                duration: 0.8,
+                scale: 1,
+                duration: 0.75,
+                delay: i * 0.08,
                 ease: 'power2.out',
                 scrollTrigger: {
                     trigger: frame,
-                    start: 'top 88%',
+                    start: 'top 90%',
                     toggleActions: 'play none none reverse',
                 },
             }
@@ -488,7 +520,7 @@ if (!prefersReducedMotion) {
 
     gsap.to('.hero-title .title-accent', {
         backgroundPosition: '200% center',
-        duration: 4,
+        duration: 5,
         repeat: -1,
         ease: 'none',
     });

@@ -274,7 +274,8 @@ h2 {
     font-size: 0.65rem;
     letter-spacing: 0.25em;
     text-transform: uppercase;
-    animation: float-hint 2s ease-in-out infinite;
+    animation: float-hint 2.5s ease-in-out infinite;
+    transition: opacity 0.4s ease;
 }
 
 .scroll-hint-line {
@@ -333,12 +334,13 @@ h2 {
     padding: 2rem 1.5rem;
     backdrop-filter: blur(12px);
     transform-style: preserve-3d;
-    transition: transform 0.1s linear, border-color 0.3s ease;
+    transition: transform 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
     will-change: transform;
 }
 
 .info-card:hover {
     border-color: rgba(241, 20, 20, 0.4);
+    box-shadow: 0 16px 40px rgba(180, 6, 6, 0.12);
 }
 
 .card-icon {
@@ -430,6 +432,12 @@ body.gallery-active #webgl-canvas {
     border: 1px solid var(--glass-border);
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
     position: relative;
+    transition: transform 0.45s ease, box-shadow 0.45s ease;
+}
+
+.gallery-frame:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 28px 70px rgba(180, 6, 6, 0.15);
 }
 
 .gallery-frame::after {
