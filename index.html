@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ROYAL CLEAN LOZNICA</title>
-    <link rel="icon" type="image/x-icon" href="ima1ges1.png">
+    <link rel="icon" type="image/png" href="assets/logo.png">
     <link rel="stylesheet" href="index.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -20,7 +20,7 @@
 
     <nav class="nav" id="nav">
         <div class="nav-left">
-            <img src="ima1ges.jpg" alt="Royal Clean logo" class="nav-logo" onerror="this.style.display='none'">
+            <img src="assets/logo.png" alt="Royal Clean logo" class="nav-logo">
             <a href="#hero" class="nav-brand">ROYAL CLEAN</a>
         </div>
         <button class="nav-toggle" id="nav-toggle" aria-label="Meni">
@@ -38,10 +38,13 @@
     <main class="scroll-root">
         <section class="panel panel-hero" id="hero" data-scene="0">
             <div class="panel-content">
-                <span class="eyebrow">Tepih servis · Loznica</span>
-                <h1 class="hero-title">Prljav tepih nije problem.</h1>
-                <p class="hero-subtitle">Ako znaš koga da pozoveš.</p>
-                <button class="cta-btn" data-scroll-to="#services">SAZNAJTE VIŠE</button>
+                <span class="eyebrow reveal-item">Tepih servis · Loznica</span>
+                <h1 class="hero-title">
+                    <span class="title-line reveal-item">Prljav tepih</span>
+                    <span class="title-line reveal-item title-accent">nije problem.</span>
+                </h1>
+                <p class="hero-subtitle reveal-item">Ako znaš koga da pozoveš.</p>
+                <button class="cta-btn reveal-item" data-scroll-to="#services">SAZNAJTE VIŠE</button>
             </div>
             <div class="scroll-hint">
                 <span>Skroluj</span>
@@ -51,60 +54,60 @@
 
         <section class="panel panel-services" id="services" data-scene="1">
             <div class="panel-content panel-content-left">
-                <span class="eyebrow">Usluge</span>
-                <h2>Bez nošenja, bez gubljenja vremena</h2>
+                <span class="eyebrow reveal-item">Usluge</span>
+                <h2 class="reveal-item">Bez nošenja, bez gubljenja vremena</h2>
                 <ul class="feature-list">
-                    <li>Profesionalne mašine — dubinsko i temeljno</li>
-                    <li>Svežina koja ostaje danima</li>
-                    <li>Besplatno odnošenje i donošenje na teritoriji Loznice</li>
+                    <li class="reveal-item">Profesionalne mašine — dubinsko i temeljno</li>
+                    <li class="reveal-item">Svežina koja ostaje danima</li>
+                    <li class="reveal-item">Besplatno odnošenje i donošenje na teritoriji Loznice</li>
                 </ul>
             </div>
         </section>
 
         <section class="panel panel-about" id="about" data-scene="2">
             <div class="panel-content panel-content-center">
-                <span class="eyebrow">Zašto Royal Clean?</span>
-                <h2>Profesionalno pranje tepiha</h2>
+                <span class="eyebrow reveal-item">Zašto Royal Clean?</span>
+                <h2 class="reveal-item">Profesionalno pranje tepiha</h2>
                 <div class="cards-3d">
-                    <article class="info-card" data-card="0">
+                    <article class="info-card reveal-item" data-card="0">
                         <div class="card-icon"><i class="fas fa-shield-virus"></i></div>
                         <h3>Grinje i bakterije</h3>
                         <p>Uklanjamo grinje i bakterije dubinskim pranjem</p>
                     </article>
-                    <article class="info-card" data-card="1">
+                    <article class="info-card reveal-item" data-card="1">
                         <div class="card-icon"><i class="fas fa-child"></i></div>
                         <h3>Bezbedno</h3>
                         <p>Bezbedno za decu i kućne ljubimce</p>
                     </article>
-                    <article class="info-card" data-card="2">
+                    <article class="info-card reveal-item" data-card="2">
                         <div class="card-icon"><i class="fas fa-wind"></i></div>
                         <h3>Svežina</h3>
                         <p>Dugotrajan miris svežine</p>
                     </article>
                 </div>
-                <p class="price-tag">Mašinsko pranje i sušenje tepiha: <strong>270 din/m²</strong></p>
+                <p class="price-tag reveal-item">Mašinsko pranje i sušenje tepiha: <strong>270 din/m²</strong></p>
             </div>
         </section>
 
         <section class="panel panel-gallery" id="gallery" data-scene="3">
             <div class="panel-content">
                 <div class="gallery-header">
-                    <span class="eyebrow">Istaknuti radovi</span>
-                    <h2>Galerija</h2>
-                    <p>Pregledajte neke od naših istaknutih radova.</p>
+                    <span class="eyebrow reveal-item">Istaknuti radovi</span>
+                    <h2 class="reveal-item">Galerija</h2>
+                    <p class="reveal-item">Pregledajte neke od naših istaknutih radova.</p>
                 </div>
                 <div class="gallery-grid">
-                    <figure class="gallery-frame" data-frame="0">
-                        <img src="slika1.jpg" alt="Rad 1" loading="lazy">
+                    <figure class="gallery-frame reveal-item" data-frame="0">
+                        <img src="assets/gallery/1.jpg" alt="Pranje tepiha u pogonu" loading="lazy">
                     </figure>
-                    <figure class="gallery-frame" data-frame="1">
-                        <img src="slika2.jpg" alt="Rad 2" loading="lazy">
+                    <figure class="gallery-frame reveal-item" data-frame="1">
+                        <img src="assets/gallery/2.jpg" alt="Orientalni tepih posle pranja" loading="lazy">
                     </figure>
-                    <figure class="gallery-frame" data-frame="2">
-                        <img src="slika3.jpg" alt="Rad 3" loading="lazy">
+                    <figure class="gallery-frame reveal-item" data-frame="2">
+                        <img src="assets/gallery/3.jpg" alt="Detalj cvetnog tepiha" loading="lazy">
                     </figure>
-                    <figure class="gallery-frame" data-frame="3">
-                        <img src="slika4.jpg" alt="Rad 4" loading="lazy">
+                    <figure class="gallery-frame reveal-item" data-frame="3">
+                        <img src="assets/gallery/4.jpg" alt="Crveni tepih posle dubinskog pranja" loading="lazy">
                     </figure>
                 </div>
             </div>
@@ -112,23 +115,23 @@
 
         <section class="panel panel-contact" id="contact" data-scene="4">
             <div class="panel-content panel-content-center">
-                <span class="eyebrow">Kontakt</span>
-                <h2>Sve na jednom mestu</h2>
-                <p class="contact-lead">Royal Clean — pozovite nas ili posetite društvene mreže</p>
+                <span class="eyebrow reveal-item">Kontakt</span>
+                <h2 class="reveal-item">Sve na jednom mestu</h2>
+                <p class="contact-lead reveal-item">Royal Clean — pozovite nas ili posetite društvene mreže</p>
                 <div class="contact-grid">
-                    <a href="https://maps.app.goo.gl/gW66uauTck3dFXFZ9" target="_blank" rel="noopener" class="contact-item">
+                    <a href="https://maps.app.goo.gl/gW66uauTck3dFXFZ9" target="_blank" rel="noopener" class="contact-item reveal-item">
                         <i class="fas fa-map-marker-alt"></i>
                         <span>Pane Đukića 2, Klupci – Loznica</span>
                     </a>
-                    <a href="tel:0658893322" class="contact-item">
+                    <a href="tel:0658893322" class="contact-item reveal-item">
                         <i class="fas fa-phone"></i>
                         <span>065/889-33-22</span>
                     </a>
-                    <a href="https://www.facebook.com/p/Tepih-servis-Royal-Clean-015-61576982436202/" target="_blank" rel="noopener" class="contact-item">
+                    <a href="https://www.facebook.com/p/Tepih-servis-Royal-Clean-015-61576982436202/" target="_blank" rel="noopener" class="contact-item reveal-item">
                         <i class="fab fa-facebook"></i>
                         <span>Tepih servis Royal Clean 015</span>
                     </a>
-                    <a href="https://www.instagram.com/royalcleanloznica?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==" target="_blank" rel="noopener" class="contact-item">
+                    <a href="https://www.instagram.com/royalcleanloznica?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==" target="_blank" rel="noopener" class="contact-item reveal-item">
                         <i class="fab fa-instagram"></i>
                         <span>royalcleanloznica</span>
                     </a>

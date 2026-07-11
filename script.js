@@ -2,583 +2,494 @@ import * as THREE from 'three';
 
 gsap.registerPlugin(ScrollTrigger);
 
+const ASSETS = {
+    logo: 'assets/logo.png',
+    heroBg: 'assets/hero-bg.jpg',
+    carpet: 'assets/gallery/3.jpg',
+};
+
 const canvas = document.getElementById('webgl-canvas');
 const progressBar = document.querySelector('.scroll-progress-bar');
 const nav = document.getElementById('nav');
 const panels = gsap.utils.toArray('.panel');
 const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-// --- Three.js setup ---
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.1;
+renderer.toneMappingExposure = 1.15;
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0x0a0a0f, 0.035);
+scene.fog = new THREE.FogExp2(0x08080d, 0.028);
 
-const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
-camera.position.set(0, 2.5, 8);
+const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 120);
+const cameraTarget = new THREE.Vector3(0, 0.4, 0);
+const cameraPosition = new THREE.Vector3(0, 2.8, 9);
+
+const loader = new THREE.TextureLoader();
+const textures = {};
+
+function loadTexture(key, url) {
+    return new Promise((resolve) => {
+        loader.load(
+            url,
+            (tex) => {
+                tex.colorSpace = THREE.SRGBColorSpace;
+                textures[key] = tex;
+                resolve(tex);
+            },
+            undefined,
+            () => {
+                console.warn(`Texture not loaded: ${url}`);
+                resolve(null);
+            }
+        );
+    });
+}
+
+await Promise.all([
+    loadTexture('heroBg', ASSETS.heroBg),
+    loadTexture('carpet', ASSETS.carpet),
+    loadTexture('logo', ASSETS.logo),
+]);
+
+const fallbackCarpet = new THREE.CanvasTexture(createFallbackCarpet());
+fallbackCarpet.colorSpace = THREE.SRGBColorSpace;
+fallbackCarpet.wrapS = fallbackCarpet.wrapT = THREE.RepeatWrapping;
+fallbackCarpet.repeat.set(2, 1);
+
+function createFallbackCarpet() {
+    const size = 128;
+    const c = document.createElement('canvas');
+    c.width = size;
+    c.height = size;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#8b6914';
+    ctx.fillRect(0, 0, size, size);
+    return c;
+}
 
 // Lights
-const ambient = new THREE.AmbientLight(0xffffff, 0.4);
-scene.add(ambient);
-
-const keyLight = new THREE.DirectionalLight(0xffffff, 1.2);
-keyLight.position.set(5, 8, 5);
+scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+const keyLight = new THREE.DirectionalLight(0xfff2e6, 1.4);
+keyLight.position.set(6, 10, 4);
 scene.add(keyLight);
 
-const rimLight = new THREE.DirectionalLight(0xf11414, 0.8);
-rimLight.position.set(-4, 2, -3);
+const rimLight = new THREE.DirectionalLight(0xf11414, 1.1);
+rimLight.position.set(-5, 3, -4);
 scene.add(rimLight);
 
-const fillLight = new THREE.PointLight(0x4488ff, 0.5, 20);
-fillLight.position.set(0, 3, 4);
-scene.add(fillLight);
+const spotLight = new THREE.SpotLight(0xffffff, 2, 30, Math.PI / 5, 0.4, 1);
+spotLight.position.set(0, 8, 2);
+scene.add(spotLight);
 
-// --- Carpet (main 3D object) ---
-function createCarpetTexture(dirty = true) {
-    const size = 256;
-    const canvas2d = document.createElement('canvas');
-    canvas2d.width = size;
-    canvas2d.height = size;
-    const ctx = canvas2d.getContext('2d');
+// Hero backdrop from real photo
+const backdrop = new THREE.Mesh(
+    new THREE.SphereGeometry(40, 48, 48),
+    new THREE.MeshBasicMaterial({
+        map: textures.heroBg || null,
+        color: textures.heroBg ? 0xffffff : 0x12080c,
+        side: THREE.BackSide,
+        opacity: textures.heroBg ? 0.55 : 0.9,
+        transparent: true,
+    })
+);
+scene.add(backdrop);
 
-    const baseColor = dirty ? [120, 85, 55] : [220, 215, 205];
-    ctx.fillStyle = `rgb(${baseColor[0]}, ${baseColor[1]}, ${baseColor[2]})`;
-    ctx.fillRect(0, 0, size, size);
-
-    for (let i = 0; i < 8000; i++) {
-        const x = Math.random() * size;
-        const y = Math.random() * size;
-        const len = 2 + Math.random() * 6;
-        const angle = Math.random() * Math.PI;
-        const shade = dirty
-            ? 70 + Math.random() * 60
-            : 190 + Math.random() * 50;
-        ctx.strokeStyle = dirty
-            ? `rgba(${shade}, ${shade * 0.7}, ${shade * 0.45}, 0.6)`
-            : `rgba(${shade}, ${shade}, ${shade - 10}, 0.4)`;
-        ctx.lineWidth = 0.5 + Math.random();
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.lineTo(x + Math.cos(angle) * len, y + Math.sin(angle) * len);
-        ctx.stroke();
-    }
-
-    if (dirty) {
-        for (let i = 0; i < 30; i++) {
-            const x = Math.random() * size;
-            const y = Math.random() * size;
-            const r = 5 + Math.random() * 20;
-            const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
-            grad.addColorStop(0, 'rgba(40, 25, 15, 0.5)');
-            grad.addColorStop(1, 'rgba(40, 25, 15, 0)');
-            ctx.fillStyle = grad;
-            ctx.fillRect(x - r, y - r, r * 2, r * 2);
-        }
-    }
-
-    const tex = new THREE.CanvasTexture(canvas2d);
-    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(4, 2);
-    return tex;
-}
-
-const dirtyTex = createCarpetTexture(true);
-const cleanTex = createCarpetTexture(false);
-
+// Carpet with real texture
 const carpetGroup = new THREE.Group();
-const carpetGeo = new THREE.BoxGeometry(5, 0.15, 3, 32, 1, 16);
 const carpetMat = new THREE.MeshStandardMaterial({
-    map: dirtyTex,
-    roughness: 0.85,
-    metalness: 0.05,
+    map: textures.carpet || fallbackCarpet,
+    roughness: 0.82,
+    metalness: 0.04,
 });
-const carpet = new THREE.Mesh(carpetGeo, carpetMat);
-carpet.castShadow = true;
-carpet.receiveShadow = true;
+const carpet = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.14, 3.2, 40, 1, 24), carpetMat);
 carpetGroup.add(carpet);
 
-// Carpet fringe edges
-const fringeMat = new THREE.MeshStandardMaterial({ color: 0x8b6914, roughness: 0.9 });
-[-2.55, 2.55].forEach((x) => {
-    const fringe = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 3.1), fringeMat);
-    fringe.position.x = x;
-    carpetGroup.add(fringe);
+const fringeMat = new THREE.MeshStandardMaterial({ color: 0x6e4f2e, roughness: 0.92 });
+[-2.65, 2.65].forEach((x) => {
+    carpetGroup.add(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.1, 3.25), fringeMat).translateX(x));
 });
-
 scene.add(carpetGroup);
 
-// --- Cleaning machine (simple geometric) ---
+// Cleaning machine
 const machineGroup = new THREE.Group();
-machineGroup.visible = false;
+const machineMat = new THREE.MeshStandardMaterial({ color: 0x232330, metalness: 0.65, roughness: 0.28 });
+const redMat = new THREE.MeshStandardMaterial({ color: 0xb40606, metalness: 0.45, roughness: 0.35 });
 
-const machineBody = new THREE.Mesh(
-    new THREE.BoxGeometry(1.2, 0.8, 0.7),
-    new THREE.MeshStandardMaterial({ color: 0x2a2a35, metalness: 0.6, roughness: 0.3 })
-);
-machineBody.position.y = 0.5;
+const machineBody = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.75, 0.75), machineMat);
+machineBody.position.y = 0.48;
 machineGroup.add(machineBody);
 
-const machineTank = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.35, 0.35, 0.9, 16),
-    new THREE.MeshStandardMaterial({ color: 0xb40606, metalness: 0.4, roughness: 0.4 })
-);
-machineTank.position.set(0.5, 1.1, 0);
+const machineTank = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.36, 0.95, 20), redMat);
+machineTank.position.set(0.55, 1.15, 0);
 machineGroup.add(machineTank);
 
-const nozzle = new THREE.Mesh(
-    new THREE.BoxGeometry(0.6, 0.15, 0.3),
-    new THREE.MeshStandardMaterial({ color: 0x444455, metalness: 0.7, roughness: 0.2 })
-);
-nozzle.position.set(-0.8, 0.3, 0.4);
+const nozzle = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.12, 0.28), machineMat);
+nozzle.position.set(-0.95, 0.28, 0.45);
 machineGroup.add(nozzle);
 
-machineGroup.position.set(3, 0, 1);
 scene.add(machineGroup);
 
-// --- Bubbles / particles ---
-const bubbleCount = prefersReducedMotion ? 80 : 300;
-const bubbleGeo = new THREE.BufferGeometry();
-const bubblePositions = new Float32Array(bubbleCount * 3);
-const bubbleSizes = new Float32Array(bubbleCount);
+// Foam particles
+const foamCount = prefersReducedMotion ? 120 : 420;
+const foamGeo = new THREE.BufferGeometry();
+const foamPos = new Float32Array(foamCount * 3);
+const foamVel = new Float32Array(foamCount * 3);
+const foamLife = new Float32Array(foamCount);
 
-for (let i = 0; i < bubbleCount; i++) {
-    bubblePositions[i * 3] = (Math.random() - 0.5) * 6;
-    bubblePositions[i * 3 + 1] = Math.random() * 4;
-    bubblePositions[i * 3 + 2] = (Math.random() - 0.5) * 4;
-    bubbleSizes[i] = 0.02 + Math.random() * 0.06;
+for (let i = 0; i < foamCount; i++) resetFoam(i);
+function resetFoam(i, origin = new THREE.Vector3(-1.2, 0.35, 0.3)) {
+    foamPos[i * 3] = origin.x + (Math.random() - 0.5) * 0.2;
+    foamPos[i * 3 + 1] = origin.y + Math.random() * 0.15;
+    foamPos[i * 3 + 2] = origin.z + (Math.random() - 0.5) * 0.2;
+    foamVel[i * 3] = -0.02 - Math.random() * 0.03;
+    foamVel[i * 3 + 1] = 0.01 + Math.random() * 0.025;
+    foamVel[i * 3 + 2] = (Math.random() - 0.5) * 0.02;
+    foamLife[i] = Math.random();
 }
-
-bubbleGeo.setAttribute('position', new THREE.BufferAttribute(bubblePositions, 3));
-bubbleGeo.setAttribute('size', new THREE.BufferAttribute(bubbleSizes, 1));
-
-const bubbleMat = new THREE.PointsMaterial({
-    color: 0x88ccff,
-    size: 0.08,
+foamGeo.setAttribute('position', new THREE.BufferAttribute(foamPos, 3));
+const foamMat = new THREE.PointsMaterial({
+    color: 0xc8ecff,
+    size: 0.07,
     transparent: true,
     opacity: 0,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
 });
-const bubbles = new THREE.Points(bubbleGeo, bubbleMat);
-scene.add(bubbles);
+const foam = new THREE.Points(foamGeo, foamMat);
+scene.add(foam);
 
-// --- Gallery 3D frames ---
-const galleryGroup = new THREE.Group();
-galleryGroup.visible = false;
-const frameMeshes = [];
-
-const framePositions = [
-    [-1.8, 1.2, 0],
-    [1.8, 1.2, 0],
-    [-1.8, -1.2, 0],
-    [1.8, -1.2, 0],
-];
-
-const loader = new THREE.TextureLoader();
-const placeholderColors = [0xb40606, 0x2a4a6b, 0x4a2a6b, 0x2a6b4a];
-
-framePositions.forEach((pos, i) => {
-    const frameGroup = new THREE.Group();
-
-    const frameBorder = new THREE.Mesh(
-        new THREE.BoxGeometry(1.6, 1.2, 0.08),
-        new THREE.MeshStandardMaterial({ color: 0x1a1a25, metalness: 0.5, roughness: 0.4 })
+// About orbit rings (abstract, no images)
+const orbitGroup = new THREE.Group();
+for (let i = 0; i < 3; i++) {
+    const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(1.6 + i * 0.45, 0.025, 12, 80),
+        new THREE.MeshStandardMaterial({
+            color: 0xf11414,
+            emissive: 0x7a0303,
+            emissiveIntensity: 0.6,
+            metalness: 0.85,
+            roughness: 0.15,
+            transparent: true,
+            opacity: 0.85,
+        })
     );
-    frameGroup.add(frameBorder);
-
-    const imgGeo = new THREE.PlaneGeometry(1.4, 1.0);
-    const imgMat = new THREE.MeshStandardMaterial({
-        color: placeholderColors[i],
-        roughness: 0.6,
-        metalness: 0.1,
-    });
-
-    const imgNames = ['slika1.jpg', 'slika2.jpg', 'slika3.jpg', 'slika4.jpg'];
-    loader.load(
-        imgNames[i],
-        (tex) => {
-            imgMat.map = tex;
-            imgMat.color.set(0xffffff);
-            imgMat.needsUpdate = true;
-        },
-        undefined,
-        () => {}
-    );
-
-    const imgPlane = new THREE.Mesh(imgGeo, imgMat);
-    imgPlane.position.z = 0.05;
-    frameGroup.add(imgPlane);
-
-    frameGroup.position.set(...pos);
-    frameGroup.rotation.y = (i % 2 === 0 ? -1 : 1) * 0.3;
-    galleryGroup.add(frameGroup);
-    frameMeshes.push(frameGroup);
-});
-
-scene.add(galleryGroup);
-
-// --- Contact ring ---
-const contactGroup = new THREE.Group();
-contactGroup.visible = false;
-
-const ringGeo = new THREE.TorusGeometry(2.5, 0.04, 16, 100);
-const ringMat = new THREE.MeshStandardMaterial({
-    color: 0xf11414,
-    emissive: 0xb40606,
-    emissiveIntensity: 0.5,
-    metalness: 0.8,
-    roughness: 0.2,
-});
-const ring = new THREE.Mesh(ringGeo, ringMat);
-ring.rotation.x = Math.PI / 2;
-contactGroup.add(ring);
-
-const ring2 = ring.clone();
-ring2.scale.set(0.7, 0.7, 0.7);
-ring2.material = ringMat.clone();
-ring2.material.emissiveIntensity = 0.3;
-contactGroup.add(ring2);
-
-const starCount = prefersReducedMotion ? 40 : 150;
-const starGeo = new THREE.BufferGeometry();
-const starPos = new Float32Array(starCount * 3);
-for (let i = 0; i < starCount; i++) {
-    const angle = (i / starCount) * Math.PI * 2;
-    const r = 2 + Math.random() * 1.5;
-    starPos[i * 3] = Math.cos(angle) * r;
-    starPos[i * 3 + 1] = (Math.random() - 0.5) * 0.5;
-    starPos[i * 3 + 2] = Math.sin(angle) * r;
+    ring.rotation.x = Math.PI / 2 + i * 0.35;
+    ring.rotation.y = i * 1.1;
+    orbitGroup.add(ring);
 }
-starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
-const stars = new THREE.Points(
-    starGeo,
-    new THREE.PointsMaterial({ color: 0xf11414, size: 0.05, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending })
-);
-contactGroup.add(stars);
+scene.add(orbitGroup);
 
+// Gallery 3D — light corridor only (no duplicate photos)
+const galleryLightGroup = new THREE.Group();
+const beamMat = new THREE.MeshBasicMaterial({
+    color: 0xf11414,
+    transparent: true,
+    opacity: 0.12,
+    side: THREE.DoubleSide,
+});
+for (let i = 0; i < 5; i++) {
+    const beam = new THREE.Mesh(new THREE.PlaneGeometry(0.15, 8), beamMat.clone());
+    beam.position.set((i - 2) * 1.4, 2, -i * 0.8);
+    beam.rotation.x = -0.4;
+    beam.rotation.y = (i - 2) * 0.18;
+    galleryLightGroup.add(beam);
+}
+const galleryFloor = new THREE.Mesh(
+    new THREE.PlaneGeometry(12, 12),
+    new THREE.MeshStandardMaterial({
+        color: 0x111118,
+        metalness: 0.9,
+        roughness: 0.15,
+        transparent: true,
+        opacity: 0.5,
+    })
+);
+galleryFloor.rotation.x = -Math.PI / 2;
+galleryFloor.position.y = -0.55;
+galleryLightGroup.add(galleryFloor);
+scene.add(galleryLightGroup);
+
+// Contact portal with logo
+const contactGroup = new THREE.Group();
+const portalRing = new THREE.Mesh(
+    new THREE.TorusGeometry(2.4, 0.045, 20, 120),
+    new THREE.MeshStandardMaterial({ color: 0xf11414, emissive: 0xb40606, emissiveIntensity: 0.7, metalness: 0.9, roughness: 0.1 })
+);
+portalRing.rotation.x = Math.PI / 2;
+contactGroup.add(portalRing);
+
+const portalRing2 = portalRing.clone();
+portalRing2.scale.setScalar(0.72);
+portalRing2.material = portalRing.material.clone();
+portalRing2.material.emissiveIntensity = 0.35;
+contactGroup.add(portalRing2);
+
+const logoPlane = new THREE.Mesh(
+    new THREE.CircleGeometry(0.9, 48),
+    new THREE.MeshBasicMaterial({
+        map: textures.logo || null,
+        color: textures.logo ? 0xffffff : 0xf11414,
+        transparent: true,
+    })
+);
+logoPlane.position.z = 0.15;
+contactGroup.add(logoPlane);
 scene.add(contactGroup);
 
-// --- Floor grid ---
-const gridHelper = new THREE.GridHelper(20, 40, 0x1a1a2e, 0x111118);
-gridHelper.position.y = -0.5;
-gridHelper.material.opacity = 0.3;
+const gridHelper = new THREE.GridHelper(24, 48, 0x2a1020, 0x12121a);
+gridHelper.position.y = -0.55;
+gridHelper.material.opacity = 0.22;
 gridHelper.material.transparent = true;
 scene.add(gridHelper);
 
-// --- Scroll state ---
-const scrollState = {
-    progress: 0,
-    sceneIndex: 0,
-    sceneProgress: 0,
-    lookAt: new THREE.Vector3(0, 0, 0),
-};
+// Camera keyframes per scene
+const CAMERAS = [
+    { pos: [0, 2.8, 9], look: [0, 0.2, 0] },
+    { pos: [1.2, 3.2, 5.5], look: [-0.8, 0.3, 0] },
+    { pos: [2.5, 4.2, 4.5], look: [0, 1.2, -1] },
+    { pos: [0, 1.8, 8], look: [0, 0.5, -2] },
+    { pos: [0, 2.5, 5.5], look: [0, 0.2, 0] },
+];
 
+const scrollState = { progress: 0, sceneIndex: 0, sceneProgress: 0, blend: 0 };
 const SCENE_COUNT = 5;
 
-function getSceneFromProgress(p) {
-    const idx = Math.min(Math.floor(p * SCENE_COUNT), SCENE_COUNT - 1);
-    const local = (p * SCENE_COUNT) - idx;
-    return { idx, local: Math.min(local, 1) };
+function easeInOutCubic(t) {
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 }
 
-function updateScene3D() {
+function lerpScene(a, b, t) {
+    return a + (b - a) * t;
+}
+
+function getSceneFromProgress(p) {
+    const scaled = p * SCENE_COUNT;
+    const idx = Math.min(Math.floor(scaled), SCENE_COUNT - 1);
+    return { idx, local: easeInOutCubic(Math.min(scaled - idx, 1)) };
+}
+
+function blendCamera(idx, local) {
+    const current = CAMERAS[idx];
+    const next = CAMERAS[Math.min(idx + 1, SCENE_COUNT - 1)];
+    const t = idx === SCENE_COUNT - 1 ? 0 : local;
+
+    cameraPosition.set(
+        lerpScene(current.pos[0], next.pos[0], t * 0.35),
+        lerpScene(current.pos[1], next.pos[1], t * 0.35),
+        lerpScene(current.pos[2], next.pos[2], t * 0.35)
+    );
+    cameraTarget.set(
+        lerpScene(current.look[0], next.look[0], t * 0.35),
+        lerpScene(current.look[1], next.look[1], t * 0.35),
+        lerpScene(current.look[2], next.look[2], t * 0.35)
+    );
+    camera.position.lerp(cameraPosition, 0.12);
+}
+
+function updateScene3D(time) {
     const { idx, local } = getSceneFromProgress(scrollState.progress);
     scrollState.sceneIndex = idx;
     scrollState.sceneProgress = local;
 
-    const t = local;
-    const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    blendCamera(idx, local);
 
-    // Reset visibility
-    machineGroup.visible = idx === 1;
-    galleryGroup.visible = idx === 3;
-    contactGroup.visible = idx === 4;
+    const show = (group, amount) => { group.visible = amount > 0.02; };
 
-    // Crossfade between scenes
-    const fadeOut = 1 - ease;
-    const fadeIn = ease;
+    // Global backdrop
+    backdrop.material.opacity = 0.35 + (idx === 0 ? 0.25 * (1 - local) : 0);
 
-    switch (idx) {
-        case 0: {
-            // Hero: rotating dirty carpet
-            carpetGroup.visible = true;
-            carpetGroup.rotation.y = scrollState.progress * Math.PI * 2;
-            carpetGroup.rotation.x = Math.sin(scrollState.progress * Math.PI) * 0.15;
-            carpetGroup.position.set(0, Math.sin(scrollState.progress * Math.PI * 4) * 0.1, 0);
-            carpetGroup.scale.setScalar(1);
-            carpetMat.map = dirtyTex;
-            carpetMat.needsUpdate = true;
-            camera.position.lerp(new THREE.Vector3(
-                Math.sin(scrollState.progress * Math.PI) * 1.5,
-                2.5 + Math.sin(scrollState.progress * Math.PI * 2) * 0.3,
-                8 - scrollState.progress * 2
-            ), 0.1);
-            scrollState.lookAt.set(0, 0, 0);
-            bubbleMat.opacity = 0;
-            break;
+    // Scene weights for smooth crossfade
+    const weights = [0, 0, 0, 0, 0];
+    weights[idx] = 1 - local;
+    if (idx < SCENE_COUNT - 1) weights[idx + 1] = local;
+
+    // Hero + carpet base
+    const carpetWeight = weights[0] + weights[1] + weights[2];
+    carpetGroup.visible = carpetWeight > 0.05;
+    carpetMat.color.setRGB(
+        lerpScene(0.72, 1, weights[1] + weights[2]),
+        lerpScene(0.68, 1, weights[1] + weights[2]),
+        lerpScene(0.62, 1, weights[1] + weights[2])
+    );
+
+    carpetGroup.rotation.y = scrollState.progress * Math.PI * 1.6 + time * 0.15 * weights[0];
+    carpetGroup.rotation.x = -0.12 + weights[2] * (-Math.PI / 2 + 0.35);
+    carpetGroup.position.set(
+        lerpScene(0, -1.6, weights[1]),
+        lerpScene(0, 1.6, weights[2]),
+        lerpScene(0, -1.8, weights[2])
+    );
+    carpetGroup.scale.setScalar(lerpScene(1, 0.85, weights[2]));
+
+    // Services
+    show(machineGroup, weights[1]);
+    machineGroup.position.set(lerpScene(3.5, 1.2, local * weights[1]), 0, 0.6);
+    machineGroup.rotation.y = -0.35 - local * 0.4;
+    foamMat.opacity = weights[1] * 0.85;
+
+    if (weights[1] > 0.05) {
+        const arr = foamGeo.attributes.position.array;
+        for (let i = 0; i < foamCount; i++) {
+            arr[i * 3] += foamVel[i * 3];
+            arr[i * 3 + 1] += foamVel[i * 3 + 1];
+            arr[i * 3 + 2] += foamVel[i * 3 + 2];
+            foamLife[i] += 0.02;
+            if (foamLife[i] > 1 || arr[i * 3] < -3) resetFoam(i);
         }
-        case 1: {
-            // Services: carpet cleaning animation
-            carpetGroup.visible = true;
-            const cleanAmount = ease;
-            carpetGroup.rotation.y = Math.PI * 0.25;
-            carpetGroup.rotation.z = 0;
-            carpetGroup.position.set(-1.5, 0, 0);
-            carpetGroup.scale.setScalar(1);
-
-            carpetMat.map = cleanAmount > 0.5 ? cleanTex : dirtyTex;
-            carpetMat.color.lerpColors(
-                new THREE.Color(0x8b6914),
-                new THREE.Color(0xffffff),
-                cleanAmount
-            );
-            carpetMat.needsUpdate = true;
-
-            machineGroup.position.set(2.5 - ease * 3, 0, 0.5);
-            machineGroup.rotation.y = -ease * 0.5;
-
-            bubbleMat.opacity = ease * 0.7;
-            const positions = bubbleGeo.attributes.position.array;
-            for (let i = 0; i < bubbleCount; i++) {
-                positions[i * 3] += Math.sin(Date.now() * 0.001 + i) * 0.002;
-                positions[i * 3 + 1] += 0.008 + Math.random() * 0.004;
-                if (positions[i * 3 + 1] > 4) positions[i * 3 + 1] = 0;
-            }
-            bubbleGeo.attributes.position.needsUpdate = true;
-
-            camera.position.lerp(new THREE.Vector3(0, 3, 6), 0.08);
-            scrollState.lookAt.set(-0.5, 0.5, 0);
-            break;
-        }
-        case 2: {
-            // About: carpet floating with cards feel
-            carpetGroup.visible = true;
-            carpetGroup.rotation.x = -Math.PI / 2 + ease * 0.3;
-            carpetGroup.rotation.y = ease * Math.PI;
-            carpetGroup.position.set(0, 1.5 + Math.sin(Date.now() * 0.001) * 0.1, -2);
-            carpetGroup.scale.setScalar(0.8 + ease * 0.2);
-            carpetMat.map = cleanTex;
-            carpetMat.color.set(0xffffff);
-            carpetMat.needsUpdate = true;
-
-            bubbleMat.opacity = (1 - ease) * 0.3;
-
-            camera.position.lerp(new THREE.Vector3(
-                Math.sin(ease * Math.PI) * 3,
-                4,
-                5
-            ), 0.08);
-            scrollState.lookAt.set(0, 1, -1);
-            break;
-        }
-        case 3: {
-            // Gallery: 3D frames carousel
-            carpetGroup.visible = false;
-            bubbleMat.opacity = 0;
-
-            galleryGroup.rotation.y = ease * Math.PI * 0.5;
-            frameMeshes.forEach((frame, i) => {
-                const offset = (i / frameMeshes.length) * Math.PI * 2;
-                const angle = ease * Math.PI + offset;
-                frame.rotation.y = Math.sin(angle) * 0.4;
-                frame.position.z = Math.sin(angle) * 0.5;
-                frame.scale.setScalar(0.8 + Math.sin(angle + ease * Math.PI) * 0.2);
-            });
-
-            camera.position.lerp(new THREE.Vector3(0, 0.5, 7 - ease), 0.08);
-            scrollState.lookAt.set(0, 0, 0);
-            break;
-        }
-        case 4: {
-            // Contact: ring portal
-            carpetGroup.visible = false;
-            bubbleMat.opacity = 0;
-
-            ring.rotation.z = scrollState.progress * Math.PI * 4;
-            ring2.rotation.z = -scrollState.progress * Math.PI * 3;
-            contactGroup.rotation.y = ease * Math.PI * 2;
-
-            const starArr = starGeo.attributes.position.array;
-            for (let i = 0; i < starCount; i++) {
-                const angle = (i / starCount) * Math.PI * 2 + Date.now() * 0.0005;
-                const r = 2 + Math.sin(angle * 3) * 0.5;
-                starArr[i * 3] = Math.cos(angle) * r;
-                starArr[i * 3 + 2] = Math.sin(angle) * r;
-            }
-            starGeo.attributes.position.needsUpdate = true;
-
-            camera.position.lerp(new THREE.Vector3(
-                Math.sin(ease * Math.PI * 2) * 0.5,
-                2 + ease,
-                6 - ease * 2
-            ), 0.08);
-            scrollState.lookAt.set(0, 0, 0);
-            break;
-        }
+        foamGeo.attributes.position.needsUpdate = true;
     }
 
-    gridHelper.material.opacity = 0.15 + (1 - Math.abs(idx - 2) / 2) * 0.15;
+    // About rings
+    show(orbitGroup, weights[2]);
+    orbitGroup.rotation.y = time * 0.35;
+    orbitGroup.position.copy(carpetGroup.position);
+    orbitGroup.children.forEach((ring, i) => {
+        ring.rotation.z = time * (0.4 + i * 0.15);
+    });
+
+    // Gallery lights only
+    show(galleryLightGroup, weights[3]);
+    galleryLightGroup.rotation.y = local * 0.6 + time * 0.08;
+    galleryLightGroup.children.forEach((child, i) => {
+        if (child.material?.opacity !== undefined && i < 5) {
+            child.material.opacity = 0.08 + Math.sin(time * 1.5 + i) * 0.05 + weights[3] * 0.1;
+        }
+    });
+
+    // Contact portal
+    show(contactGroup, weights[4]);
+    portalRing.rotation.z = time * 0.55;
+    portalRing2.rotation.z = -time * 0.75;
+    contactGroup.rotation.y = Math.sin(time * 0.25) * 0.15;
+    logoPlane.rotation.z = Math.sin(time * 0.4) * 0.05;
+
+    gridHelper.material.opacity = 0.12 + carpetWeight * 0.12;
+    spotLight.intensity = 1.5 + weights[1] * 1.2;
 }
 
-// --- Animation loop ---
 const clock = new THREE.Clock();
-
 function animate() {
     requestAnimationFrame(animate);
-    const elapsed = clock.getElapsedTime();
-
-    if (scrollState.sceneIndex === 0) {
-        carpetGroup.rotation.y += 0.003;
-    }
-
-    if (scrollState.sceneIndex === 4) {
-        ring.rotation.z = elapsed * 0.5;
-        ring2.rotation.z = -elapsed * 0.7;
-    }
-
-    camera.lookAt(scrollState.lookAt);
-
+    const t = clock.getElapsedTime();
+    updateScene3D(t);
+    camera.lookAt(cameraTarget);
     renderer.render(scene, camera);
 }
-
 animate();
 
-// --- Lenis smooth scroll ---
+// Lenis + scroll
 let lenis;
 if (!prefersReducedMotion) {
-    lenis = new Lenis({
-        duration: 1.4,
-        easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-        smoothWheel: true,
-    });
+    lenis = new Lenis({ duration: 1.2, smoothWheel: true });
 
     lenis.on('scroll', ({ scroll, progress }) => {
         scrollState.progress = progress;
         progressBar.style.width = `${progress * 100}%`;
         nav.classList.toggle('scrolled', scroll > 50);
-        updateScene3D();
         updateActiveNav();
-        updateCardTilts(scroll);
+        updateCardTilts();
         ScrollTrigger.update();
     });
 
-    gsap.ticker.add((time) => {
-        lenis.raf(time * 1000);
-    });
+    gsap.ticker.add((time) => lenis.raf(time * 1000));
     gsap.ticker.lagSmoothing(0);
 } else {
     window.addEventListener('scroll', () => {
         const max = document.documentElement.scrollHeight - window.innerHeight;
         scrollState.progress = window.scrollY / max;
         progressBar.style.width = `${scrollState.progress * 100}%`;
-        updateScene3D();
+        updateScene3D(0);
     });
 }
 
-// --- GSAP scroll animations for content ---
-panels.forEach((panel, i) => {
-    const content = panel.querySelector('.panel-content');
-    if (!content) return;
-
-    if (prefersReducedMotion) {
-        gsap.set(content, { opacity: 1, y: 0 });
-        return;
-    }
-
-    gsap.fromTo(content,
-        { opacity: 0, y: 80 },
-        {
-            opacity: 1,
-            y: 0,
-            duration: 1,
-            ease: 'power3.out',
-            scrollTrigger: {
-                trigger: panel,
-                start: 'top 75%',
-                end: 'top 25%',
-                scrub: 1,
-                toggleActions: 'play none none reverse',
-            },
-        }
-    );
-
-    // Parallax on text per section
-    gsap.to(content, {
-        y: -40,
-        ease: 'none',
-        scrollTrigger: {
-            trigger: panel,
-            start: 'top bottom',
-            end: 'bottom top',
-            scrub: 1.5,
-        },
+// Content animations
+if (!prefersReducedMotion) {
+    panels.forEach((panel) => {
+        const items = panel.querySelectorAll('.reveal-item');
+        gsap.fromTo(items,
+            { opacity: 0, y: 50, rotateX: 8 },
+            {
+                opacity: 1,
+                y: 0,
+                rotateX: 0,
+                duration: 0.9,
+                stagger: 0.12,
+                ease: 'power3.out',
+                scrollTrigger: {
+                    trigger: panel,
+                    start: 'top 72%',
+                    toggleActions: 'play none none reverse',
+                },
+            }
+        );
     });
-});
 
-// Info cards 3D tilt on scroll
+    document.querySelectorAll('.gallery-frame').forEach((frame, i) => {
+        gsap.fromTo(frame,
+            { opacity: 0, scale: 0.85, rotateY: i % 2 ? 12 : -12 },
+            {
+                opacity: 1,
+                scale: 1,
+                rotateY: 0,
+                duration: 1,
+                ease: 'power2.out',
+                scrollTrigger: {
+                    trigger: frame,
+                    start: 'top 85%',
+                    toggleActions: 'play none none reverse',
+                },
+            }
+        );
+
+        gsap.to(frame, {
+            y: -30 * (i % 2 ? 1 : -1),
+            ease: 'none',
+            scrollTrigger: {
+                trigger: '#gallery',
+                start: 'top bottom',
+                end: 'bottom top',
+                scrub: 1.8,
+            },
+        });
+    });
+
+    gsap.to('.hero-title .title-accent', {
+        backgroundPosition: '200% center',
+        duration: 4,
+        repeat: -1,
+        ease: 'none',
+    });
+}
+
 function updateCardTilts() {
     if (prefersReducedMotion) return;
-    const cards = document.querySelectorAll('.info-card');
     const aboutPanel = document.getElementById('about');
     if (!aboutPanel) return;
-
     const rect = aboutPanel.getBoundingClientRect();
-    const panelCenter = rect.top + rect.height / 2;
-    const viewCenter = window.innerHeight / 2;
-    const dist = (panelCenter - viewCenter) / window.innerHeight;
+    const dist = ((rect.top + rect.height / 2) - window.innerHeight / 2) / window.innerHeight;
 
-    cards.forEach((card, i) => {
-        const offset = (i - 1) * 0.3;
-        const rotateY = dist * 15 + offset * 10;
-        const rotateX = -dist * 8;
-        const translateZ = Math.max(0, (1 - Math.abs(dist)) * 40);
-        card.style.transform = `perspective(800px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateZ(${translateZ}px)`;
+    document.querySelectorAll('.info-card').forEach((card, i) => {
+        const offset = (i - 1) * 12;
+        card.style.transform = `perspective(900px) rotateX(${-dist * 10}deg) rotateY(${dist * 18 + offset}deg) translateZ(${Math.max(0, 50 - Math.abs(dist) * 40)}px)`;
     });
 }
 
-// Gallery frames parallax
-document.querySelectorAll('.gallery-frame').forEach((frame, i) => {
-    if (prefersReducedMotion) return;
-    gsap.to(frame, {
-        rotateY: (i % 2 === 0 ? -8 : 8),
-        z: 60,
-        ease: 'none',
-        scrollTrigger: {
-            trigger: '#gallery',
-            start: 'top bottom',
-            end: 'bottom top',
-            scrub: 2,
-        },
-    });
-});
-
-// --- Nav ---
 function updateActiveNav() {
-    const links = document.querySelectorAll('.nav-link');
-    const idx = scrollState.sceneIndex;
-    links.forEach((link) => {
-        const linkIdx = parseInt(link.dataset.index, 10);
-        link.classList.toggle('active', linkIdx === idx);
+    document.querySelectorAll('.nav-link').forEach((link) => {
+        link.classList.toggle('active', parseInt(link.dataset.index, 10) === scrollState.sceneIndex);
     });
 }
 
 document.querySelectorAll('.nav-link, .cta-btn').forEach((el) => {
     el.addEventListener('click', (e) => {
         e.preventDefault();
-        const href = el.getAttribute('href') || el.dataset.scrollTo;
-        const target = document.querySelector(href);
+        const target = document.querySelector(el.getAttribute('href') || el.dataset.scrollTo);
         if (!target) return;
-
-        if (lenis) {
-            lenis.scrollTo(target, { offset: 0, duration: 1.8 });
-        } else {
-            target.scrollIntoView({ behavior: 'smooth' });
-        }
-
+        if (lenis) lenis.scrollTo(target, { duration: 1.6 });
+        else target.scrollIntoView({ behavior: 'smooth' });
         document.getElementById('nav-menu')?.classList.remove('open');
         document.getElementById('nav-toggle')?.classList.remove('open');
     });
@@ -589,24 +500,10 @@ document.getElementById('nav-toggle')?.addEventListener('click', () => {
     document.getElementById('nav-toggle').classList.toggle('open');
 });
 
-// --- Resize ---
-function onResize() {
+window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
-}
-
-window.addEventListener('resize', onResize);
-
-// --- Image fallbacks ---
-document.querySelectorAll('.gallery-frame img').forEach((img, i) => {
-    img.addEventListener('error', () => {
-        const colors = ['#b40606', '#2a4a6b', '#4a2a6b', '#2a6b4a'];
-        img.style.display = 'none';
-        img.parentElement.style.background = `linear-gradient(135deg, ${colors[i]}, #1a1a25)`;
-    });
 });
 
-// Initial state
-updateScene3D();
-progressBar.style.width = '0%';
+updateScene3D(0);

@@ -163,7 +163,7 @@ html, body {
 }
 
 .panel {
-    min-height: 100vh;
+    min-height: 110vh;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -174,8 +174,9 @@ html, body {
 .panel-content {
     max-width: 1100px;
     width: 100%;
-    opacity: 0;
-    transform: translateY(60px);
+}
+
+.reveal-item {
     will-change: transform, opacity;
 }
 
@@ -204,7 +205,22 @@ html, body {
     font-weight: 800;
     line-height: 1.05;
     margin: 0 0 0.5rem;
-    background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.75) 100%);
+}
+
+.title-line {
+    display: block;
+}
+
+.title-line:first-child {
+    background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.8) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.title-accent {
+    background: linear-gradient(90deg, #fff 0%, #f11414 50%, #fff 100%);
+    background-size: 200% auto;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -387,11 +403,20 @@ h2 {
     border-radius: 16px;
     overflow: hidden;
     aspect-ratio: 4/3;
-    background: linear-gradient(135deg, var(--dark-soft), #1e1e2e);
+    background: var(--dark-soft);
     border: 1px solid var(--glass-border);
     transform-style: preserve-3d;
-    will-change: transform;
+    will-change: transform, opacity;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    position: relative;
+}
+
+.gallery-frame::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, transparent 40%, rgba(241, 20, 20, 0.08));
+    pointer-events: none;
 }
 
 .gallery-frame img {
@@ -526,10 +551,5 @@ h2 {
 @media (prefers-reduced-motion: reduce) {
     .scroll-hint {
         animation: none;
-    }
-
-    .panel-content {
-        opacity: 1;
-        transform: none;
     }
 }
