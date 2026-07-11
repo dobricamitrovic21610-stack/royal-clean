@@ -324,11 +324,14 @@ function weightsBlend(idx, local, targetIdx) {
     return w[targetIdx] || 0;
 }
 
-function setGalleryMode(active, fade = 0) {
-    const on = active || fade > 0.02;
-    document.body.classList.toggle('gallery-active', on);
-    canvas.classList.toggle('is-hidden', on);
-    scrollState.render3D = !on;
+function isGalleryZone(weights) {
+    return weights[3] > 0.08 && weights[4] < 0.5;
+}
+
+function setGalleryMode(active) {
+    document.body.classList.toggle('gallery-active', active);
+    canvas.classList.toggle('is-hidden', active);
+    scrollState.render3D = !active;
 }
 
 function updateScene3D(time) {
@@ -340,25 +343,18 @@ function updateScene3D(time) {
     weights[idx] = 1 - local;
     if (idx < SCENE_COUNT - 1) weights[idx + 1] = local;
 
-    const galleryActive = weights[3];
-    const approachingGallery = weights[2] > 0.1 && weights[3] > 0;
-    const exitGallery = weights[3] > 0 && weights[4] > 0;
+    const galleryZone = isGalleryZone(weights);
+    const galleryBlend = easeInOutQuart(Math.min(1, weights[3] * 2.5));
 
-    // Fade 3D out before gallery, stay off through gallery
-    const scene3DFade = Math.max(0, 1 - easeInOutQuart(Math.min(1, galleryActive * 2.2 + approachingGallery * 0.4)));
-    canvas.style.opacity = scene3DFade;
-    setGalleryMode(galleryActive > 0.2 || (galleryActive > 0.05 && !exitGallery), galleryActive);
+    setGalleryMode(galleryZone);
+    canvas.style.opacity = galleryZone ? 0 : Math.max(0.1, 1 - galleryBlend * 0.9);
 
-    if (!scrollState.render3D) {
-        return;
-    }
+    if (!scrollState.render3D) return;
 
     blendCamera(idx, local, time);
-
     backdrop.rotation.y = time * 0.04 + scrollState.progress * 0.3;
 
-    // Fade out about scene early when heading to gallery
-    const preGalleryFade = 1 - easeInOutQuart(Math.min(1, galleryActive * 3 + weights[2] * approachingGallery * 0.15));
+    const preGalleryFade = 1 - galleryBlend * 0.95;
 
     backdrop.visible = true;
     gridHelper.visible = true;
