@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -9,6 +12,14 @@ const progressBar = document.querySelector('.scroll-progress-bar');
 const nav = document.getElementById('nav');
 const panels = gsap.utils.toArray('.panel');
 const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const pointer = { x: 0, y: 0, targetX: 0, targetY: 0 };
+
+if (!prefersReducedMotion) {
+    window.addEventListener('pointermove', (e) => {
+        pointer.targetX = (e.clientX / window.innerWidth - 0.5) * 2;
+        pointer.targetY = (e.clientY / window.innerHeight - 0.5) * 2;
+    });
+}
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -22,6 +33,16 @@ scene.fog = new THREE.FogExp2(0x06060b, 0.022);
 const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 120);
 const cameraTarget = new THREE.Vector3(0, 0.4, 0);
 const cameraPosition = new THREE.Vector3(0, 3, 10);
+
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloomPass = new UnrealBloomPass(
+    new THREE.Vector2(window.innerWidth, window.innerHeight),
+    prefersReducedMotion ? 0.25 : 0.62,
+    0.38,
+    0.78
+);
+composer.addPass(bloomPass);
 
 const loader = new THREE.TextureLoader();
 const textures = {};
@@ -126,12 +147,21 @@ const fringeMat = new THREE.MeshStandardMaterial({ color: 0x6e4f2e, roughness: 0
 [-2.75, 2.75].forEach((x) => {
     carpetGroup.add(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.11, 3.35), fringeMat).translateX(x));
 });
+const heroGlow = new THREE.PointLight(0xf11414, 0, 12);
+heroGlow.position.set(0, 1.5, 2);
 heroGroup.add(carpetGroup);
+heroGroup.add(heroGlow);
 
 const carpetCleanMat = new THREE.MeshStandardMaterial({ map: dirtyTex, roughness: 0.8, metalness: 0.05 });
 const carpetClean = new THREE.Group();
 const cleanMesh = new THREE.Mesh(new THREE.BoxGeometry(5, 0.14, 3, 40, 1, 24), carpetCleanMat);
 carpetClean.add(cleanMesh);
+const cleanOverlay = new THREE.Mesh(
+    new THREE.BoxGeometry(5, 0.145, 3, 40, 1, 24),
+    new THREE.MeshStandardMaterial({ map: cleanTex, roughness: 0.55, metalness: 0.12, transparent: true, opacity: 0 })
+);
+cleanOverlay.position.y = 0.002;
+carpetClean.add(cleanOverlay);
 carpetClean.position.set(-1.8, 0, 0);
 carpetClean.scale.setScalar(0.95);
 
@@ -186,6 +216,39 @@ for (let i = 0; i < foamCount; i++) resetFoam(i);
 foamGeo.setAttribute('position', new THREE.BufferAttribute(foamPos, 3));
 const foamMat = new THREE.PointsMaterial({ color: 0xc8ecff, size: 0.08, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false });
 servicesGroup.add(new THREE.Points(foamGeo, foamMat));
+
+const steamCount = prefersReducedMotion ? 40 : 160;
+const steamGeo = new THREE.BufferGeometry();
+const steamPos = new Float32Array(steamCount * 3);
+const steamVel = new Float32Array(steamCount * 3);
+const steamLife = new Float32Array(steamCount);
+function resetSteam(i) {
+    steamPos[i * 3] = -1.9 + (Math.random() - 0.5) * 0.5;
+    steamPos[i * 3 + 1] = 0.35 + Math.random() * 0.15;
+    steamPos[i * 3 + 2] = 0.45 + (Math.random() - 0.5) * 0.4;
+    steamVel[i * 3] = (Math.random() - 0.5) * 0.008;
+    steamVel[i * 3 + 1] = 0.018 + Math.random() * 0.025;
+    steamVel[i * 3 + 2] = (Math.random() - 0.5) * 0.008;
+    steamLife[i] = Math.random();
+}
+for (let i = 0; i < steamCount; i++) resetSteam(i);
+steamGeo.setAttribute('position', new THREE.BufferAttribute(steamPos, 3));
+const steamMat = new THREE.PointsMaterial({ color: 0xddeeff, size: 0.11, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
+servicesGroup.add(new THREE.Points(steamGeo, steamMat));
+
+const sparkleCount = prefersReducedMotion ? 30 : 120;
+const sparkleGeo = new THREE.BufferGeometry();
+const sparklePos = new Float32Array(sparkleCount * 3);
+const sparklePhase = new Float32Array(sparkleCount);
+for (let i = 0; i < sparkleCount; i++) {
+    sparklePos[i * 3] = -1.8 + (Math.random() - 0.5) * 4.5;
+    sparklePos[i * 3 + 1] = 0.2 + Math.random() * 0.25;
+    sparklePos[i * 3 + 2] = (Math.random() - 0.5) * 2.5;
+    sparklePhase[i] = Math.random() * Math.PI * 2;
+}
+sparkleGeo.setAttribute('position', new THREE.BufferAttribute(sparklePos, 3));
+const sparkleMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.06, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
+servicesGroup.add(new THREE.Points(sparkleGeo, sparkleMat));
 
 // ABOUT: rings + 3 orbs + floating carpet
 const orbitRings = new THREE.Group();
@@ -282,6 +345,20 @@ portalRing2.material = portalRing.material.clone();
 portalRing2.material.emissiveIntensity = 0.35;
 contactGroup.add(portalRing2);
 
+const portalCore = new THREE.Mesh(
+    new THREE.CircleGeometry(1.8, 64),
+    new THREE.MeshBasicMaterial({ color: 0xf11414, transparent: true, opacity: 0.08, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })
+);
+portalCore.rotation.x = Math.PI / 2;
+contactGroup.add(portalCore);
+
+const portalRing3 = portalRing.clone();
+portalRing3.scale.setScalar(1.35);
+portalRing3.material = portalRing.material.clone();
+portalRing3.material.opacity = 0.35;
+portalRing3.material.transparent = true;
+contactGroup.add(portalRing3);
+
 const logoPlane = new THREE.Mesh(
     new THREE.CircleGeometry(1, 56),
     new THREE.MeshBasicMaterial({ map: textures.logo || null, color: textures.logo ? 0xffffff : 0xf11414, transparent: true })
@@ -360,6 +437,9 @@ function setGroupOpacity(group, amount) {
 backdrop.material.userData.baseOpacity = 0.5;
 
 function updateScene3D(time) {
+    pointer.x += (pointer.targetX - pointer.x) * 0.06;
+    pointer.y += (pointer.targetY - pointer.y) * 0.06;
+
     const { idx, local, w } = getWeights(scrollState.progress);
     scrollState.sceneIndex = idx;
 
@@ -368,11 +448,22 @@ function updateScene3D(time) {
     const nxt = CAMERAS[Math.min(idx + 1, SCENE_COUNT - 1)];
     const ct = idx === SCENE_COUNT - 1 ? 0 : ease(local);
     const sway = Math.sin(time * 0.35) * 0.1;
-    cameraPosition.set(lerp(cur.pos[0], nxt.pos[0], ct) + sway, lerp(cur.pos[1], nxt.pos[1], ct), lerp(cur.pos[2], nxt.pos[2], ct));
-    cameraTarget.set(lerp(cur.look[0], nxt.look[0], ct), lerp(cur.look[1], nxt.look[1], ct) + Math.sin(time * 0.4) * 0.04, lerp(cur.look[2], nxt.look[2], ct));
+    const parallax = 1 - scrollState.progress * 0.35;
+    cameraPosition.set(
+        lerp(cur.pos[0], nxt.pos[0], ct) + sway + pointer.x * 0.45 * parallax,
+        lerp(cur.pos[1], nxt.pos[1], ct) - pointer.y * 0.28 * parallax,
+        lerp(cur.pos[2], nxt.pos[2], ct)
+    );
+    cameraTarget.set(
+        lerp(cur.look[0], nxt.look[0], ct) + pointer.x * 0.18 * parallax,
+        lerp(cur.look[1], nxt.look[1], ct) + Math.sin(time * 0.4) * 0.04 - pointer.y * 0.1 * parallax,
+        lerp(cur.look[2], nxt.look[2], ct)
+    );
     camera.position.lerp(cameraPosition, 0.13);
     camera.fov = lerp(cur.fov, nxt.fov, ct);
     camera.updateProjectionMatrix();
+
+    bloomPass.strength = prefersReducedMotion ? 0.25 : 0.45 + w[0] * 0.25 + w[3] * 0.2 + w[4] * 0.35;
 
     canvas.style.opacity = 1;
 
@@ -389,10 +480,12 @@ function updateScene3D(time) {
 
     // HERO carpet
     carpetGroup.rotation.y = scrollState.progress * Math.PI * 2.5 + time * 0.3;
-    carpetGroup.rotation.x = -0.08 + Math.sin(time * 1.1) * 0.06;
-    carpetGroup.rotation.z = Math.sin(time * 0.6) * 0.04;
+    carpetGroup.rotation.x = -0.08 + Math.sin(time * 1.1) * 0.06 + pointer.y * 0.04;
+    carpetGroup.rotation.z = Math.sin(time * 0.6) * 0.04 + pointer.x * 0.03;
     carpetGroup.position.y = Math.sin(time * 1.4) * 0.12;
     carpetGroup.scale.setScalar(1 + Math.sin(time * 1.8) * 0.03);
+    heroGlow.intensity = 0.6 + w[0] * 2.2 + Math.sin(time * 2.5) * 0.4;
+    heroGlow.position.x = Math.sin(time * 0.8) * 0.6;
     dustMat.opacity = 0.3 + w[0] * 0.4;
 
     // SERVICES
@@ -401,8 +494,14 @@ function updateScene3D(time) {
     machineGroup.rotation.y = lerp(-0.1, -0.85, mT);
     nozzle.rotation.x = Math.sin(time * 6) * 0.07;
     sprayCone.material.opacity = 0.08 + w[1] * 0.15;
-    carpetCleanMat.map = mT > 0.5 ? cleanTex : dirtyTex;
+    sprayCone.scale.set(1 + Math.sin(time * 8) * 0.08, 1 + w[1] * 0.3, 1 + Math.sin(time * 8) * 0.08);
+    carpetCleanMat.map = mT > 0.35 ? cleanTex : dirtyTex;
     carpetClean.rotation.y = 0.3;
+    cleanOverlay.material.opacity = THREE.MathUtils.smoothstep(mT, 0.25, 0.85);
+    cleanOverlay.scale.x = THREE.MathUtils.lerp(0.05, 1, mT);
+    cleanOverlay.position.x = THREE.MathUtils.lerp(-2.4, 0, mT);
+    steamMat.opacity = w[1] * 0.55;
+    sparkleMat.opacity = Math.max(0, (mT - 0.45) * 1.4) * w[1];
 
     if (w[1] > 0.05) {
         const arr = foamGeo.attributes.position.array;
@@ -414,6 +513,22 @@ function updateScene3D(time) {
             if (foamLife[i] > 1 || arr[i * 3] < -4) resetFoam(i);
         }
         foamGeo.attributes.position.needsUpdate = true;
+
+        const sArr = steamGeo.attributes.position.array;
+        for (let i = 0; i < steamCount; i++) {
+            sArr[i * 3] += steamVel[i * 3] + Math.sin(time * 3 + i) * 0.001;
+            sArr[i * 3 + 1] += steamVel[i * 3 + 1];
+            sArr[i * 3 + 2] += steamVel[i * 3 + 2];
+            steamLife[i] += 0.018;
+            if (steamLife[i] > 1 || sArr[i * 3 + 1] > 2.5) resetSteam(i);
+        }
+        steamGeo.attributes.position.needsUpdate = true;
+
+        const spArr = sparkleGeo.attributes.position.array;
+        for (let i = 0; i < sparkleCount; i++) {
+            spArr[i * 3 + 1] = 0.2 + Math.sin(time * 4 + sparklePhase[i]) * 0.08 + mT * 0.05;
+        }
+        sparkleGeo.attributes.position.needsUpdate = true;
     }
 
     // ABOUT
@@ -439,6 +554,10 @@ function updateScene3D(time) {
         frame.position.y = frameLayout[i].pos[1] + Math.sin(angle) * 0.15;
         frame.rotation.y = frameLayout[i].rot + Math.sin(time * 0.5 + i) * 0.1;
         frame.scale.setScalar(0.8 + gT * 0.25);
+        const inner = frame.children[1];
+        if (inner?.material?.emissiveIntensity !== undefined) {
+            inner.material.emissiveIntensity = 0.35 + Math.sin(time * 2 + i * 1.2) * 0.25 + w[3] * 0.5;
+        }
     });
     helixMat.opacity = 0.3 + w[3] * 0.5;
 
@@ -446,7 +565,11 @@ function updateScene3D(time) {
     const cT = ease(w[4]);
     portalRing.rotation.z = time * 0.7;
     portalRing2.rotation.z = -time * 0.95;
-    contactGroup.rotation.y = Math.sin(time * 0.3) * 0.2;
+    portalRing3.rotation.z = time * 0.45;
+    portalRing3.scale.setScalar(1.35 + Math.sin(time * 1.8) * 0.06);
+    portalCore.material.opacity = 0.05 + cT * 0.18 + Math.sin(time * 3) * 0.04;
+    portalCore.scale.setScalar(1 + Math.sin(time * 2.2) * 0.08);
+    contactGroup.rotation.y = Math.sin(time * 0.3) * 0.2 + pointer.x * 0.08;
     contactGroup.scale.setScalar(0.8 + cT * 0.25 + Math.sin(time * 1.2) * 0.03);
     logoPlane.rotation.z = Math.sin(time * 0.4) * 0.06;
 
@@ -469,7 +592,7 @@ function animate() {
     requestAnimationFrame(animate);
     updateScene3D(clock.getElapsedTime());
     camera.lookAt(cameraTarget);
-    renderer.render(scene, camera);
+    composer.render();
 }
 animate();
 
@@ -555,6 +678,8 @@ window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+    composer.setSize(window.innerWidth, window.innerHeight);
+    bloomPass.resolution.set(window.innerWidth, window.innerHeight);
 });
 
 updateScene3D(0);
