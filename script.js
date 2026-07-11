@@ -279,7 +279,7 @@ const CAMERAS = [
     { pos: [0, 2.8, 4.8], look: [0, 0.3, 0] },
 ];
 
-const scrollState = { progress: 0, sceneIndex: 0, sceneProgress: 0, blend: 0 };
+const scrollState = { progress: 0, sceneIndex: 0, sceneProgress: 0, render3D: true };
 const SCENE_COUNT = 5;
 
 function lerpScene(a, b, t) {
@@ -324,41 +324,47 @@ function weightsBlend(idx, local, targetIdx) {
     return w[targetIdx] || 0;
 }
 
+function setGalleryMode(active, fade = 0) {
+    const on = active || fade > 0.02;
+    document.body.classList.toggle('gallery-active', on);
+    canvas.classList.toggle('is-hidden', on);
+    scrollState.render3D = !on;
+}
+
 function updateScene3D(time) {
     const { idx, local } = getSceneFromProgress(scrollState.progress);
     scrollState.sceneIndex = idx;
     scrollState.sceneProgress = local;
-
-    blendCamera(idx, local, time);
 
     const weights = [0, 0, 0, 0, 0];
     weights[idx] = 1 - local;
     if (idx < SCENE_COUNT - 1) weights[idx + 1] = local;
 
     const galleryActive = weights[3];
-    const canvasFade = Math.max(0, 1 - easeInOutQuart(Math.min(1, galleryActive * 1.8)));
-    canvas.style.opacity = canvasFade;
-    canvas.style.transition = 'opacity 0.35s ease';
+    const approachingGallery = weights[2] > 0.1 && weights[3] > 0;
+    const exitGallery = weights[3] > 0 && weights[4] > 0;
 
-    backdrop.rotation.y = time * 0.04 + scrollState.progress * 0.3;
+    // Fade 3D out before gallery, stay off through gallery
+    const scene3DFade = Math.max(0, 1 - easeInOutQuart(Math.min(1, galleryActive * 2.2 + approachingGallery * 0.4)));
+    canvas.style.opacity = scene3DFade;
+    setGalleryMode(galleryActive > 0.2 || (galleryActive > 0.05 && !exitGallery), galleryActive);
 
-    if (galleryActive > 0.12) {
-        carpetGroup.visible = false;
-        machineGroup.visible = false;
-        orbitGroup.visible = false;
-        contactGroup.visible = false;
-        backdrop.visible = false;
-        gridHelper.visible = false;
-        foamMat.opacity = 0;
+    if (!scrollState.render3D) {
         return;
     }
 
+    blendCamera(idx, local, time);
+
+    backdrop.rotation.y = time * 0.04 + scrollState.progress * 0.3;
+
+    // Fade out about scene early when heading to gallery
+    const preGalleryFade = 1 - easeInOutQuart(Math.min(1, galleryActive * 3 + weights[2] * approachingGallery * 0.15));
+
     backdrop.visible = true;
     gridHelper.visible = true;
+    backdrop.material.opacity = (0.3 + weights[0] * 0.35) * preGalleryFade;
 
-    backdrop.material.opacity = 0.3 + weights[0] * 0.35;
-
-    const carpetWeight = weights[0] + weights[1] + weights[2];
+    const carpetWeight = (weights[0] + weights[1] + weights[2]) * preGalleryFade;
     carpetGroup.visible = carpetWeight > 0.05;
 
     const cleanBlend = Math.min(1, weights[1] * 1.5 + weights[2]);
@@ -370,15 +376,15 @@ function updateScene3D(time) {
     );
 
     const heroBoost = weights[0];
-    carpetGroup.rotation.y = scrollState.progress * Math.PI * 2 + time * 0.28 * heroBoost;
-    carpetGroup.rotation.x = -0.12 + Math.sin(time * 1.1) * 0.06 * heroBoost + weights[2] * (-Math.PI / 2 + 0.35);
-    carpetGroup.rotation.z = Math.sin(time * 0.7) * 0.05 * heroBoost;
+    carpetGroup.rotation.y = scrollState.progress * Math.PI * 2.2 + time * 0.32 * heroBoost;
+    carpetGroup.rotation.x = -0.1 + Math.sin(time * 1.2) * 0.07 * heroBoost + weights[2] * (-Math.PI / 2 + 0.38);
+    carpetGroup.rotation.z = Math.sin(time * 0.75) * 0.06 * heroBoost;
     carpetGroup.position.set(
-        lerpScene(0, -1.6, easeInOutQuart(weights[1])),
-        lerpScene(Math.sin(time * 1.3) * 0.12, 1.6, easeInOutQuart(weights[2])),
-        lerpScene(0, -1.8, easeInOutQuart(weights[2]))
+        lerpScene(0, -1.5, easeInOutQuart(weights[1])),
+        lerpScene(Math.sin(time * 1.4) * 0.14, 1.7, easeInOutQuart(weights[2])),
+        lerpScene(0, -1.6, easeInOutQuart(weights[2]))
     );
-    carpetGroup.scale.setScalar(lerpScene(1 + Math.sin(time * 1.8) * 0.03, 0.84, easeInOutQuart(weights[2])));
+    carpetGroup.scale.setScalar(lerpScene(1 + Math.sin(time * 2) * 0.035, 0.86, easeInOutQuart(weights[2])));
 
     machineGroup.visible = weights[1] > 0.04;
     const machineT = easeInOutQuart(weights[1]);
@@ -403,7 +409,7 @@ function updateScene3D(time) {
         foamGeo.attributes.position.needsUpdate = true;
     }
 
-    orbitGroup.visible = weights[2] > 0.04;
+    orbitGroup.visible = weights[2] > 0.04 && preGalleryFade > 0.1;
     orbitGroup.rotation.y = time * 0.45;
     orbitGroup.position.copy(carpetGroup.position);
     orbitGroup.children.forEach((ring, i) => {
@@ -429,8 +435,10 @@ function animate() {
     requestAnimationFrame(animate);
     const t = clock.getElapsedTime();
     updateScene3D(t);
-    camera.lookAt(cameraTarget);
-    renderer.render(scene, camera);
+    if (scrollState.render3D) {
+        camera.lookAt(cameraTarget);
+        renderer.render(scene, camera);
+    }
 }
 animate();
 
@@ -443,11 +451,6 @@ if (!prefersReducedMotion) {
         scrollState.progress = progress;
         progressBar.style.width = `${progress * 100}%`;
         nav.classList.toggle('scrolled', scroll > 50);
-        const { idx, local } = getSceneFromProgress(progress);
-        const w = [0, 0, 0, 0, 0];
-        w[idx] = 1 - local;
-        if (idx < SCENE_COUNT - 1) w[idx + 1] = local;
-        document.body.classList.toggle('gallery-active', w[3] > 0.25);
         document.querySelector('.scroll-hint')?.style.setProperty('opacity', scroll > 80 ? '0' : '1');
         updateActiveNav();
         updateCardTilts();
@@ -477,7 +480,7 @@ if (!prefersReducedMotion) {
     });
 
     panels.forEach((panel) => {
-        if (panel.id === 'hero') return;
+        if (panel.id === 'hero' || panel.id === 'gallery') return;
         const items = panel.querySelectorAll('.reveal-item');
         gsap.fromTo(items,
             { opacity: 0, y: 45, filter: 'blur(6px)' },
@@ -491,28 +494,38 @@ if (!prefersReducedMotion) {
                 scrollTrigger: {
                     trigger: panel,
                     start: 'top 70%',
-                    end: 'top 30%',
-                    scrub: false,
-                    toggleActions: 'play none none reverse',
+                    toggleActions: 'play none none none',
                 },
             }
         );
     });
 
+    gsap.from('#gallery .gallery-header .reveal-item', {
+        opacity: 0,
+        y: 35,
+        duration: 0.8,
+        stagger: 0.12,
+        ease: 'power2.out',
+        scrollTrigger: {
+            trigger: '#gallery',
+            start: 'top 70%',
+            toggleActions: 'play none none none',
+        },
+    });
+
     document.querySelectorAll('.gallery-frame').forEach((frame, i) => {
         gsap.fromTo(frame,
-            { opacity: 0, y: 50, scale: 0.96 },
+            { opacity: 0, y: 30 },
             {
                 opacity: 1,
                 y: 0,
-                scale: 1,
-                duration: 0.75,
-                delay: i * 0.08,
+                duration: 0.7,
                 ease: 'power2.out',
                 scrollTrigger: {
                     trigger: frame,
-                    start: 'top 90%',
-                    toggleActions: 'play none none reverse',
+                    start: 'top 92%',
+                    toggleActions: 'play none none none',
+                    once: true,
                 },
             }
         );
